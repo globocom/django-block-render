@@ -4,7 +4,7 @@ from setuptools import setup, find_packages
 
 setup(
     name=u'block_render',
-    version="1.0.0",
+    version="1.1.0",
     description=u"Lib django to render block",
     long_description=u"""""",
     keywords='django block template render',
