@@ -1,3 +1,4 @@
+from itertools import islice
 from django.http import HttpResponse
 from django.template import loader, Context, RequestContext
 from django.template.base import Template
@@ -9,14 +10,39 @@ class BlockNotFound(Exception):
     pass
 
 
-def render_template_block(template, block, context):
+def render_template_block(template, block, context, extend_nodelist=None):
     """
     Renders a single block from a template.
     This template should have previously been rendered.
     """
     if not isinstance(template, Template):
         template = loader.get_template(template)
-    return _render_template_block_nodelist(template.nodelist, block, context)
+
+    parent_node_list = template.nodelist
+
+    if extend_nodelist:
+        _update_nodelist(parent_node_list, extend_nodelist)
+
+    return _render_template_block_nodelist(parent_node_list, block, context)
+
+def _update_nodelist(nodelist, extended_nodelist):
+    index = 0
+    iterator = islice(nodelist, 0, len(nodelist))
+
+    for node in iterator:
+        if isinstance(node, BlockNode):
+            for extended_node in extended_nodelist:
+                if isinstance(extended_node, BlockNode) and extended_node.name == node.name:
+                    nodelist[index] = extended_node
+
+        for key in ('nodelist', 'nodelist_true', 'nodelist_false'):
+            if hasattr(node, key):
+                try:
+                    _update_nodelist(getattr(node, key), extended_nodelist)
+                except:
+                    pass
+
+        index += 1
 
 
 def _render_template_block_nodelist(nodelist, block, context):
@@ -36,7 +62,7 @@ def _render_template_block_nodelist(nodelist, block, context):
         if isinstance(node, ExtendsNode):
             try:
                 rendered = render_template_block(
-                    node.get_parent(context), block, context)
+                    node.get_parent(context), block, context, extend_nodelist=node.nodelist)
             except BlockNotFound:
                 pass
             else:
